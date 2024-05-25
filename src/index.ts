@@ -18,9 +18,24 @@ app.use(express.json());
 // Welcome route
 
 app.get("/", (req: any, res: any) => {
-    res.status(200).json({
+    return res.status(200).json({
         message: "Hello world!"
     });
+});
+
+// Get all posts route
+
+app.get("/blog/bulk", async (req: any, res: any) => {
+    try{
+        const posts = await prisma.post.findMany();
+
+        return res.status(200).json({posts});
+    } catch(error){
+        console.error(error);
+        res.json({
+            error
+        });
+    }
 });
 
 // Schema for signup input data validation
@@ -52,7 +67,7 @@ app.post("/signup", async (req: any, res: any) => {
         });
 
         const token = jwt.sign({id: newUser.id}, process.env.JWT_SECRET);
-        res.status(200).json({token});
+        return res.status(200).json({token});
 
     } catch(error){
         console.error(error);
@@ -93,17 +108,21 @@ app.post("/signin", async(req: any, res: any) => {
         }
 
         const token = jwt.sign({id: user.id}, process.env.JWT_SECRET);
-        res.status(200).json({token});
+        return res.status(200).json({token});
     } catch(error){
         console.error(error);
         res.json({error});
     }
 });
 
+// Schema for blog input data validation
+
 const schema3 = zod.object({
     title: zod.string(),
     content: zod.string()
 });
+
+// Blog post route
 
 app.post("/blog", signinVerfication, async (req: any, res: any) => {
 
@@ -114,19 +133,81 @@ app.post("/blog", signinVerfication, async (req: any, res: any) => {
         });
     }
 
-    const post = await prisma.post.create({
-        data: {
-            title: req.body.title,
-            content: req.body.content,
-            authorId: req.id
-        },
-    });
+    try{
+        const post = await prisma.post.create({
+            data: {
+                title: req.body.title,
+                content: req.body.content,
+                authorId: req.id
+            },
+        });
+    
+        return res.status(200).json({
+            id: post.id
+        });
+    } catch(error){
+        console.error(error);
+        res.json({error});
+    }
 
-    return res.status(200).json({
-        id: post.id
-    });
-})
+});
 
+// Schema for blog input data validation
+
+const schema4 = zod.object({
+    id: zod.string(),
+    title: zod.string(),
+    content: zod.string()
+});
+
+// Blog update route
+
+app.put("/blog", signinVerfication, async (req: any, res: any) => {
+    const parsedPayload = schema4.safeParse({id: req.body.id, title: req.body.title, content: req.body.content});
+    if(!parsedPayload.success){
+        return res.status(403).json({
+            message: "Incorrect inputs"
+        });
+    }
+
+    try{
+        await prisma.post.update({
+            where: {
+                id: req.body.id
+            },
+            data: {
+                title: req.body.title,
+                content: req.body.content
+            }
+        });
+
+        return res.status(200).json({
+            Message: "Post Updated"
+        });
+    }catch(error){
+        console.error(error);
+        res.json({error});
+    }
+
+});
+
+// Get a post route
+
+app.get("/blog/:id", signinVerfication, async (req: any, res: any) => {
+    try{
+        const post = await prisma.post.findUnique({
+            where: {
+                id: req.params.id
+            }
+        });
+        return res.status(200).json({
+            post
+        });
+    } catch(error){
+        console.error(error);
+        res.json({error});
+    }
+});
 
 
 const PORT = 3000;
